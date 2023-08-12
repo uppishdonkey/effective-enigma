@@ -1,144 +1,107 @@
 const { User, Thought } = require('../models');
 
-const usersController = {
-  async getAllUsers(req, res) {
+module.exports = {
+  // Get all users
+  async getUsers(req, res) {
     try {
-      console.log('GET /api/users - Request received');
       const users = await User.find();
-      console.log('GET /api/users - Sending response');
-      res.json(users);
+      return res.json(users);
     } catch (err) {
-      console.error('GET /api/users - Error fetching users:', err);
-      res.status(500).json({ message: 'Error fetching users' });
+      console.log(err);
+      return res.status(500).json(err);
     }
   },
-
+  // Get a single user
   async getSingleUser(req, res) {
     try {
-      console.log(`GET /api/users/${req.params.id} - Request received`);
-      const user = await User.findById(req.params.id)
+      const user = await User.findOne({ _id: req.params.userId })
+        .select('-__v')
+        .populate('friends')
         .populate('thoughts')
-        .populate('friends');
 
       if (!user) {
-        console.log(`GET /api/users/${req.params.id} - User not found`);
-        return res.status(404).json({ message: 'User not found' });
+        return res.status(404).json({ message: 'No user with that ID' })
       }
 
-      console.log(`GET /api/users/${req.params.id} - Sending response`);
-      res.json(user);
-    } catch (error) {
-      console.error(`GET /api/users/${req.params.id} - Error fetching the user:`, error);
-      res.status(500).json({ message: 'Error fetching the user' });
+      res.json(user)
+    } catch (err) {
+      console.log(err);
+      return res.status(500).json(err);
     }
   },
-
+  // create a new user
   async createUser(req, res) {
-    console.log('POST /api/users - Request received');
-    const { username, email } = req.body;
-    const user = new User({ username, email });
     try {
-      await user.save();
-      console.log('POST /api/users - Sending response');
+      const user = await User.create(req.body);
       res.json(user);
-    } catch (error) {
-      console.error('POST /api/users - Error creating the user:', error);
-      res.status(500).json({ message: 'Error creating the user' });
+    } catch (err) {
+      res.status(500).json(err);
+    }
+  },
+  // Delete a user 
+  async deleteUser(req, res) {
+    try {
+      const user = await User.findOneAndRemove({ _id: req.params.userId });
+
+      if (!user) {
+        return res.status(404).json({ message: 'No such user exists' });
+      }
+      res.json({ message: 'User successfully deleted' });
+    } catch (err) {
+      console.log(err);
+      res.status(500).json(err);
     }
   },
 
   async updateUser(req, res) {
-    console.log(`PUT /api/users/${req.params.id} - Request received`);
-    const { username, email } = req.body;
     try {
-      const user = await User.findByIdAndUpdate(
-        req.params.id,
-        { username, email },
-        { new: true }
-      );
+      const user = await User.findOneAndUpdate({ _id: req.params.userId }, { $set: req.body }, { runValidators: true, new: true })
       if (!user) {
-        console.log(`PUT /api/users/${req.params.id} - User not found`);
-        return res.status(404).json({ message: 'User not found' });
-      }
-      console.log(`PUT /api/users/${req.params.id} - Sending response`);
-      res.json(user);
+        return res.status(404).json({ message: "No such user exists!" })
+      } res.json(user)
     } catch (error) {
-      console.error(`PUT /api/users/${req.params.id} - Error updating the user:`, error);
-      res.status(500).json({ message: 'Error updating the user' });
+      res.status(500).json(err);
     }
   },
 
-  async deleteUser(req, res) {
-    console.log(`DELETE /api/users/${req.params.id} - Request received`);
-    try {
-      const user = await User.findByIdAndDelete(req.params.id);
-      if (!user) {
-        console.log(`DELETE /api/users/${req.params.id} - User not found`);
-        return res.status(404).json({ message: 'User not found' });
-      }
-      await Thought.deleteMany({ _id: { $in: user.thoughts } });
-      console.log(`DELETE /api/users/${req.params.id} - Sending response`);
-      res.json({ message: 'User deleted successfully' });
-    } catch (error) {
-      console.error(`DELETE /api/users/${req.params.id} - Error deleting the user:`, error);
-      res.status(500).json({ message: 'Error deleting the user' });
-    }
-  },
-
+  // Add an assignment to a student
   async addFriend(req, res) {
-    console.log('POST /api/users/:userId/friends/:friendId - Request received');
-    const userId = req.params.userId;
-    const friendId = req.params.friendId;
-
-    console.log('userId:', userId);
-    console.log('friendId:', friendId);
-
     try {
-      const user = await User.findByIdAndUpdate(
-        userId,
-        { $addToSet: { friends: friendId } },
-        { new: true }
-      ).populate('friends');
-
-      console.log('updated user:', user);
+      const user = await User.findOneAndUpdate(
+        { _id: req.params.userId },
+        { $addToSet: { friends: req.params.friendId } },
+        { runValidators: true, new: true }
+      );
 
       if (!user) {
-        console.log('POST /api/users/:userId/friends/:friendId - User not found');
-        return res.status(404).json({ message: 'User not found' });
+        return res
+          .status(404)
+          .json({ message: 'No user found with that ID :(' });
       }
 
-      console.log('POST /api/users/:userId/friends/:friendId - Sending response');
       res.json(user);
-    } catch (error) {
-      console.error('POST /api/users/:userId/friends/:friendId - Error adding a friend:', error);
-      res.status(500).json({ message: 'Error adding a friend' });
+    } catch (err) {
+      res.status(500).json(err);
     }
   },
-
+  // Remove friend from a user
   async removeFriend(req, res) {
-    console.log('DELETE /api/users/:userId/friends/:friendId - Request received');
-    const userId = req.params.userId;
-    const friendId = req.params.friendId;
-
     try {
-      const user = await User.findByIdAndUpdate(
-        userId,
-        { $pull: { friends: friendId } },
-        { new: true }
-      ).populate('friends');
+      const user = await User.findOneAndUpdate(
+        { _id: req.params.userId },
+        { $pull: { friends: req.params.friendId } },
+        { runValidators: true, new: true }
+      );
 
       if (!user) {
-        console.log('DELETE /api/users/:userId/friends/:friendId - User not found');
-        return res.status(404).json({ message: 'User not found' });
+        return res
+          .status(404)
+          .json({ message: 'No user found with that ID :(' });
       }
 
-      console.log('DELETE /api/users/:userId/friends/:friendId - Sending response');
       res.json(user);
-    } catch (error) {
-      console.error('DELETE /api/users/:userId/friends/:friendId - Error removing a friend:', error);
-      res.status(500).json({ message: 'Error removing a friend' });
+    } catch (err) {
+      res.status(500).json(err);
     }
   },
 };
-
-module.exports = usersController;
