@@ -1,5 +1,6 @@
-const mongoose = require('mongoose');
-const { Schema } = mongoose;
+const { Schema, model } = require('mongoose');
+const reactionSchema = require('./reaction');
+const { format_date } = require("../utils/dayFormat");
 
 const thoughtSchema = new Schema(
   {
@@ -9,21 +10,17 @@ const thoughtSchema = new Schema(
       minlength: 1,
       maxlength: 280,
     },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
-    username: {
+    userName: {
       type: String,
       required: true,
     },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+      get: (date) => format_date(date)
+    },
     reactions: [
-      {
-        emoji: {
-          type: String,
-          required: true,
-        },
-      },
+      reactionSchema
     ],
   },
   {
@@ -35,8 +32,10 @@ const thoughtSchema = new Schema(
   }
 );
 
-thoughtSchema.virtual('reactionCount').get(function () {
-  return this.reactions.length;
-});
-const Thought = mongoose.model('Thought', thoughtSchema);
-module.exports = Thought;
+thoughtSchema.virtual("reactionCount").get(function () {
+  return this.reactions.length
+})
+
+const thought = model('thought', thoughtSchema);
+
+module.exports = thought;
