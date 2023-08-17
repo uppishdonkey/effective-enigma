@@ -19,9 +19,10 @@ const thoughtSchema = new Schema(
       default: Date.now,
       get: (date) => format_date(date)
     },
-    reactions: [
-      reactionSchema
-    ],
+    reactions: [{
+      type: Schema.Types.ObjectId,
+      ref: "reaction"
+    }],
   },
   {
     toJSON: {
